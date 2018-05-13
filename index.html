@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Indelible NoteBook</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="lib/bootstrap.min.css">
+    <style>
+         .logo {
+            width: 60%;
+            height: 250px;
+            margin: auto;
+            margin-top: 50px;
+        }
+
+        .name {
+            text-align: center;
+            font-size: 66px;
+            text-shadow: 3px 5px grey, 1px 1px #333;
+        }
+
+        .namesub {
+            text-align: center;
+            font-size: 20px;
+            color: grey;
+        }
+        
+        .search_bar {
+            width: 80%;
+            height: 100px;
+            margin: auto;
+        }
+
+        .search_result {
+            width: 80%;
+            margin: auto;
+            margin-top: 50px;
+        }
+
+        #search-value {
+            font-size: 20px;
+            width: 100%;
+            height: 50px;
+            box-shadow: 3px 5px grey, 1px 1px #333;
+        }
+
+        .list_area {
+            width: 80%;
+            margin: auto;
+            margin-top: 250px;
+        }
+
+        .hide{
+            display: none;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <div class="name">Indelible NoteBook</div>
+            <div class="namesub">A Notebook that can never be Modified or Deleted, built on <a target="_blank" href="https://nebulas.io">Nebulas</a></div>
+        </div>
+        <div class="search_area">
+            <div class="search_bar">
+                <input id="search-value" type="text">
+            </div>
+            <div class="row justify-content-center">
+                <div class="col-2">
+                    <button type="button" class="btn btn-outline-primary" id="search">Search Key</button>
+                </div>
+                <div class="col-2">
+                    <button type="button" class="btn btn-outline-primary" id="create">Create New</button>
+                </div>
+            </div>
+            <div class="search_result">
+                <div id="result-loading" class="alert alert-warning hide" role="alert">
+                    Loading...
+                </div>
+                <div id="result-success" class="form-group hide">
+                    <label for="result-content">Note Content:</label>
+                    <textarea class="form-control" id="result-content" rows="4" readonly></textarea>
+                </div>
+                <div id="result-fail" class="alert alert-danger alert-dismissible hide" role="alert">
+                    Failed to find related note
+                    <button type="button" class="close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="create-modal" tabindex="-1" role="dialog" data-backdrop="static">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Write New Note</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form>
+                            <div class="form-group">
+                                <label for="note-key" class="col-form-label">Note Key:</label>
+                                <input type="text" class="form-control" id="note-key">
+                            </div>
+                            <div class="form-group">
+                                <label for="note-content" class="col-form-label">Content:</label>
+                                <textarea class="form-control" id="note-content" rows="4"></textarea>
+                            </div>
+                        </form>
+                        <div id="submit-status" class="hide" role="alert"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button id="submit-note" type="button" class="btn btn-primary">Create Note</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="warning-modal" tabindex="-1" role="dialog">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Notice</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        You need to install <a target="_blank" href="https://github.com/ChengOrangeJu/WebExtensionWallet">WebExtensionWallet</a> to create note
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="list_area">
+            <h4><p>Recent Notes:</p></h4>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Key</th>
+                        <th scope="col">Content</th>
+                    </tr>
+                </thead>
+                <tbody id="list_body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="lib/jquery.min.js"></script>
+    <script src="lib/popper.min.js"></script>
+    <script src="lib/bootstrap.min.js"></script>
+    <script src="lib/nebulas.js"></script>
+    <script src="lib/nebPay.js"></script>
+    <script>
+        // contract address
+        var contractAddr = "n1rjk9W4zgavCaw5jArGoXQVkbwsP2D6ded";
+        // tmp user address
+        var tmpAddr = "n1XtbJnRsqE6q98WsaXEKfRwAkPdTNiHnL3";
+        
+        var Nebulas = require("nebulas");
+        var neb = new Nebulas.Neb();
+        neb.setRequest(new Nebulas.HttpRequest('https://mainnet.nebulas.io'));
+
+        var NebPay = require("nebpay");
+        var nebpay = new NebPay();
+
+        function setResultStatus(status, content) {
+            $('#result-loading').toggleClass('hide', status != 'loading');
+            $('#result-success').toggleClass('hide', status != 'success');
+            $('#result-fail').toggleClass('hide', status != 'fail');
+            if (status == 'success') {
+                $('#result-content').val(content);
+            }
+        }
+
+        $('#search').click(function() {
+            var searchKey = $('#search-value').val().trim();
+            if (!searchKey) return;
+            setResultStatus('loading');
+            neb.api.call(tmpAddr, contractAddr, "0", 1, 1000000, 2000000, {
+                "function": "getNote",
+                "args": JSON.stringify([searchKey])
+            }).then(function(resp) {
+                console.log('getNote:', resp);
+                if (!resp || !resp.result) {
+                    return setResultStatus('fail');
+                }
+                var data = JSON.parse(resp.result);
+                if (data == null) {
+                    return setResultStatus('fail');
+                }
+                setResultStatus('success', data);
+            }).catch(function(err) {
+                console.log('Err getNote:', err);
+                setResultStatus('fail');
+            })
+        });
+
+        var serial; // transcation serial
+        var timer; // query timer
+        $('#submit-note').click(function() {
+            var key = $('#note-key').val().trim();
+            var content = $('#note-content').val();
+            if (!key || !content) return;
+            $('#note-key').prop('readonly', true);
+            $('#note-content').prop('readonly', true);
+            $('#submit-note').prop('disabled', true);
+            $('#submit-status').prop('class', 'alert alert-warning').text('Loading ...');
+            serial = nebpay.call(contractAddr, "0", "createNote", JSON.stringify([key, content]), {
+                listener: function(resp) {
+                    console.log('nebpay:', resp);
+                    if (resp && resp.txhash) {
+                        clearInterval(timer);
+                        $('#submit-status').prop('class', 'alert alert-success').text('Create Note Success');
+                    }
+                }
+            });
+            var cnt = 0;
+            timer = setInterval(function() {
+                if (cnt >= 10) {
+                    clearInterval(timer);
+                    $('#submit-status').prop('class', 'alert alert-danger').text('Fail to get info. Please refresh and retry ...');
+                    return; 
+                }
+                cnt ++;
+                nebpay.queryPayInfo(serial).then(function(resp) {
+                    resp = JSON.parse(resp);
+                    if (resp.code == 0) {
+                        clearInterval(timer);
+                        $('#submit-status').prop('class', 'alert alert-success').text('Create Note Success');
+                    }
+                }).catch(function(err) {
+                    console.log('Err nebpay queryPayInfo:', err);
+                });
+            }, 12000);
+        });
+
+       $('#create').click(function() {
+            if (typeof (webExtensionWallet) === "undefined") {
+                $('#warning-modal').modal();
+                return;
+            }
+            if (timer) clearInterval(timer);
+            $('#note-key').prop('readonly', false);
+            $('#note-content').prop('readonly', false);
+            $('#submit-note').prop('disabled', false);
+            $('#submit-status').prop('class', 'hide');
+            $('#create-modal').modal();
+        });
+
+        function initRecent() {
+            neb.api.call(tmpAddr, contractAddr, "0", 1, 1000000, 2000000, {
+                "function": "listNotes",
+                "args": JSON.stringify([0,10])
+            }).then(function (resp) {
+                console.log('listNotes:', resp);
+                if (!resp || !resp.result) return;
+                var data = JSON.parse(resp.result);
+                if (data == null) return;
+                data.reverse().forEach(function(item) {
+                    $('#list_body').append('<tr><td>' + item.key +'</td><td>' + item.content + '</td></tr>');
+                })
+            }).catch(function (err) {
+                console.log('Err getNote:', err);
+            })
+        }
+
+        initRecent();
+
+    </script>
+</body>
+</html>
